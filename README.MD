@@ -1,6 +1,6 @@
 # Manticore Search Helm Chart
 
-**Version:** 25.0.0-20260611
+**Version:** 25.0.0-20260612
 
 The Manticore Search Helm Chart is designed to deploy and manage Manticore Search in Kubernetes. It ensures high availability with out-of-the-box replication and improves read throughput through automatic load balancing.
 
@@ -421,7 +421,7 @@ worker:
 
 | Variable                             | Description                                                                                         | Default                                                                                            |
 |--------------------------------------|-----------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|
-| balancer.image.repository            | Balancer docker image repository                                                                    | Docker hub                                                                                         |
+| balancer.image.repository            | Balancer docker image repository                                                                    | ghcr.io/sweet-tv/manticoresearch-helm-balancer                                                     |
 | balancer.image.tag                   | Balancer image version                                                                              | Same as chart version                                                                              |
 | balancer.image.pullPolicy            | Balancer docker image update policy                                                                 | IfNotPresent                                                                                       |
 | balancer.service.ql.port             | Balancer service SQL port (for searchd)                                                             | 9306                                                                                               |
@@ -435,7 +435,7 @@ worker:
 | balancer.config.path                 | Path to balancer config                                                                             | /mnt/configmap.conf                                                                                |
 | balancer.config.table_ha_strategy    | Distributed indexes HA strategy                                                                     | nodeads                                                                                            |
 | balancer.resources                   | Allows to set resources for balancer like mem or cpu requests and limits (see k8s docs for details) | {}                                                                                                 |
-| worker.image.repository              | Worker docker image repository                                                                      | Docker hub                                                                                         |
+| worker.image.repository              | Worker docker image repository                                                                      | ghcr.io/sweet-tv/manticoresearch-helm-worker                                                       |
 | worker.image.tag                     | Worker image version                                                                                | Same as chart version                                                                              |
 | worker.image.pullPolicy              | Worker docker image update policy                                                                   | IfNotPresent                                                                                       |
 | worker.quorumRecovery                | Worker quorum auto recovery                                                                         | false                                                                                              |

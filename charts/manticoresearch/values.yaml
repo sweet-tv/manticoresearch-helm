@@ -16,7 +16,7 @@ balancer:
   # priorityClassName: ""
   runInterval: 5
   image:
-    repository: manticoresearch/helm-balancer
+    repository: ghcr.io/sweet-tv/manticoresearch-helm-balancer
 #    tag: 3.6.0.0
     pullPolicy: IfNotPresent
   service:
@@ -104,7 +104,7 @@ worker:
     ## Example: ["--force-preread"]
     extraArgs: []
   image:
-    repository: manticoresearch/helm-worker
+    repository: ghcr.io/sweet-tv/manticoresearch-helm-worker
 #    tag: 3.6.0.0
     pullPolicy: IfNotPresent
   service:

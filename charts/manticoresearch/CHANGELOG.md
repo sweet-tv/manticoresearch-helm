@@ -1,3 +1,8 @@
+### 25.0.0-20260612
+
+* Added persistent balancer agent support via `balancer.config.agent.conn=pconn`
+* Published fork images from GHCR instead of Docker Hub
+
 ### 25.0.0-20260611
 
 * Switched to ManticoreSearch 25.0.0
