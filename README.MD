@@ -1,6 +1,6 @@
 # Manticore Search Helm Chart
 
-**Version:** 28.4.4
+**Version:** 28.4.4-20260720
 
 The Manticore Search Helm Chart is designed to deploy and manage Manticore Search in Kubernetes. It ensures high availability with out-of-the-box replication and improves read throughput through automatic load balancing.
 
@@ -153,6 +153,7 @@ You can truncate or delete tables, manually clean volumes, or delete the entire 
 - The new pod starts and runs a side process to check for active nodes.
 - It joins the oldest node or the cluster's primary worker.
 - The pod waits until it fully syncs before becoming operational.
+- Worker `server_id` values are generated from 1-based StatefulSet ordinals, so `worker-0` becomes `server_id = 1`, `worker-1` becomes `server_id = 2`, and so on.
 
 ### What happens if I uninstall the helm chart?
 The volumes will still retain the data and if you install the chart again to the same namespace you'll be able to access it.
@@ -173,8 +174,8 @@ The balancer in Manticore Search is an optional component for managing high avai
 
 #### How the Balancer Works:
 1. **Dynamic Synchronization:**
-   - If `balancer.enabled` is set to `true` (default), the balancer checks the table configuration on the first active worker every 5 seconds (configurable via the `balancer.runInterval` parameter).
-   - If the configuration changes, the balancer reloads to align with the updated list of tables and available workers.
+   - If `balancer.enabled` is set to `true` (default), the balancer checks the table configuration on the oldest Ready worker every 5 seconds (configurable via the `balancer.runInterval` parameter).
+   - If the configuration changes, the balancer reloads to align with the updated list of tables and Ready workers.
 
 2. **Event-Driven Updates:**
    - When a worker starts or stops, it sends a signal to the balancer, prompting immediate synchronization without waiting for the interval.

@@ -1,3 +1,9 @@
+### 28.4.4-20260720
+
+* Generate worker `server_id` values from 1-based StatefulSet ordinals to avoid conflicts while scaling beyond two workers
+* Configure balancers from Kubernetes Ready workers only, preventing not-yet-synced joining pods from being added to distributed table agents
+* Published fork images from GHCR instead of Docker Hub
+
 ### 28.4.4
 
 * Switched to ManticoreSearch 28.4.4
