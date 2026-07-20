@@ -43,7 +43,7 @@ You can also build/import images without running CLT:
 clt_tests/build-images-local.sh
 ```
 
-Both commands use `manticoresearch/helm-worker:0.0.0-unstable` and `manticoresearch/helm-balancer:0.0.0-unstable`, matching the test values files.
+Both commands use `manticoresearch/helm-worker:0.0.0-unstable`, `manticoresearch/helm-balancer:0.0.0-unstable`, and their `ghcr.io/sweet-tv/manticoresearch-helm-*` aliases, matching the test values files.
 
 The init block in each test exports:
 
@@ -63,6 +63,7 @@ Current standalone scenarios:
 
 - `clt_tests/tests/1-default-flow.rec`
 - `clt_tests/tests/1-no-balancer-flow.rec`
+- `clt_tests/tests/2-pod-labels.rec`
 - `clt_tests/tests/2-searchd-extra-args.rec`
 - `clt_tests/tests/2-stopwords-flow.rec`
 - `clt_tests/tests/2-wordforms-configmap.rec`
@@ -70,10 +71,12 @@ Current standalone scenarios:
 
 ## Image tags
 
-During local development the chart `appVersion` can point to an unpublished release tag, for example `25.0.0-YYYYMMDD`. For this workflow we use the latest CI images tagged `0.0.0-unstable` instead of the chart `appVersion` tag. At the time this guide was added, these images were built from commit `0a7e75999379f0403bd8e01669b906a5cb212089`.
+During local development the chart `appVersion` can point to an unpublished release tag, for example `28.4.4-YYYYMMDD`. For this workflow we use the latest CI images tagged `0.0.0-unstable` instead of the chart `appVersion` tag.
 
 - `manticoresearch/helm-worker:0.0.0-unstable`
 - `manticoresearch/helm-balancer:0.0.0-unstable`
+- `ghcr.io/sweet-tv/manticoresearch-helm-worker:0.0.0-unstable`
+- `ghcr.io/sweet-tv/manticoresearch-helm-balancer:0.0.0-unstable`
 
 For tests with the balancer disabled, set at least:
 
