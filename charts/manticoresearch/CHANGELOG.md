@@ -1,3 +1,7 @@
+### 28.4.4
+
+* Switched to ManticoreSearch 28.4.4
+
 ### 25.0.0-20260612
 
 * Added persistent balancer agent support via `balancer.config.agent.conn=pconn`
