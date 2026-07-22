@@ -49,12 +49,16 @@ done
 
 worker_image="manticoresearch/helm-worker:${tag}"
 balancer_image="manticoresearch/helm-balancer:${tag}"
+worker_image_ghcr="ghcr.io/sweet-tv/manticoresearch-helm-worker:${tag}"
+balancer_image_ghcr="ghcr.io/sweet-tv/manticoresearch-helm-balancer:${tag}"
 
 echo "Building $worker_image"
 docker build -t "$worker_image" "$repo_root/sources/manticore-worker"
+docker tag "$worker_image" "$worker_image_ghcr"
 
 echo "Building $balancer_image"
 docker build -t "$balancer_image" "$repo_root/sources/manticore-balancer"
+docker tag "$balancer_image" "$balancer_image_ghcr"
 
 if [[ "$do_import" -eq 0 ]]; then
   exit 0
@@ -67,7 +71,7 @@ if ! docker inspect "$k3s_container" >/dev/null 2>&1; then
 fi
 
 echo "Importing images into k3s container: $k3s_container"
-docker save "$worker_image" "$balancer_image" | docker exec -i "$k3s_container" ctr -n k8s.io images import -
+docker save "$worker_image" "$balancer_image" "$worker_image_ghcr" "$balancer_image_ghcr" | docker exec -i "$k3s_container" ctr -n k8s.io images import -
 
 echo "Imported:"
-docker exec "$k3s_container" ctr -n k8s.io images ls | grep -E "manticoresearch/helm-(worker|balancer):${tag}" || true
+docker exec "$k3s_container" ctr -n k8s.io images ls | grep -E "(manticoresearch/helm-(worker|balancer)|ghcr.io/sweet-tv/manticoresearch-helm-(worker|balancer)):${tag}" || true
