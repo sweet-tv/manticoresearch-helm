@@ -3,9 +3,11 @@
 
 use Core\Cache\Cache;
 use Core\K8s\ApiClient;
+use Core\K8s\Resources;
 use Core\Logger\Logger;
 use Core\Manticore\ManticoreConnector;
 use Core\Mutex\Locker;
+use Core\Notifications\NotificationStub;
 
 require 'vendor/autoload.php';
 
@@ -69,30 +71,26 @@ $cache  = new Cache();
 $locker = new Locker( 'observer' );
 $locker->checkLock();
 
-$api = new ApiClient();
+$resources = new Resources( new ApiClient(), $labels, new NotificationStub() );
 
-$workerPods = getReadyWorkerPods( $api, $labels );
-if ( $workerPods === [] ) {
-	Logger::info( "No ready workers found" );
+if ( $resources->getActivePodsCount() === 0 ) {
+	Logger::info( "No workers found" );
 	$locker->unlock();
 }
-$oldestWorker = getOldestPodName( $workerPods );
+$oldestWorker = $resources->getOldestActivePodName();
 
 if ( empty( $oldestWorker ) ) {
-	throw new RuntimeException( "Can't find oldest ready worker" );
+	throw new RuntimeException( "Can't find oldest worker" );
 }
 
 $manticore = new ManticoreConnector( $oldestWorker . '.' . $workerService, $workerPort, null, - 1 );
 $tables    = $manticore->getTables( false );
-$podsIps   = getPodIps( $workerPods );
-
-sort( $tables );
-sort( $podsIps, SORT_NATURAL );
+$podsIps   = $resources->getPodIpAllConditions();
 
 
 if ( $tables !== [] ) {
 	$previousHash = $cache->get( Cache::TABLE_HASH );
-	$hash         = sha1( implode( '.', $tables ) . implode( '.', $podsIps ) . $agentConnection );
+	$hash         = sha1( implode( '.', $tables ) . implode( $podsIps ) . $agentConnection );
 
 	if ( $previousHash !== $hash ) {
 		Logger::info( "Starting config recompiling" );
@@ -118,70 +116,6 @@ function buildDistributedTableAgentValue( $table, $nodes, $agentConnection ) {
 	}
 
 	return $agent;
-}
-
-
-function getReadyWorkerPods( ApiClient $api, array $labels ): array {
-	$pods = $api->getManticorePods( $labels );
-	if ( ! isset( $pods['items'] ) || ! is_array( $pods['items'] ) ) {
-		return [];
-	}
-
-	$readyPods = [];
-	foreach ( $pods['items'] as $pod ) {
-		if ( ( $pod['status']['phase'] ?? null ) !== 'Running' ) {
-			continue;
-		}
-		if ( empty( $pod['status']['podIP'] ) ) {
-			continue;
-		}
-		if ( ! isPodReady( $pod ) ) {
-			continue;
-		}
-
-		$readyPods[] = $pod;
-	}
-
-	usort(
-		$readyPods,
-		static function ( array $left, array $right ): int {
-			$leftCreated  = $left['metadata']['creationTimestamp'] ?? '';
-			$rightCreated = $right['metadata']['creationTimestamp'] ?? '';
-			if ( $leftCreated === $rightCreated ) {
-				return strcmp( $left['metadata']['name'] ?? '', $right['metadata']['name'] ?? '' );
-			}
-
-			return strcmp( $leftCreated, $rightCreated );
-		}
-	);
-
-	return $readyPods;
-}
-
-
-function isPodReady( array $pod ): bool {
-	foreach ( $pod['status']['conditions'] ?? [] as $condition ) {
-		if ( ( $condition['type'] ?? null ) === 'Ready' && ( $condition['status'] ?? null ) === 'True' ) {
-			return true;
-		}
-	}
-
-	return false;
-}
-
-
-function getOldestPodName( array $pods ): ?string {
-	return $pods[0]['metadata']['name'] ?? null;
-}
-
-
-function getPodIps( array $pods ): array {
-	return array_values(
-		array_map(
-			static fn( array $pod ): string => $pod['status']['podIP'],
-			$pods
-		)
-	);
 }
 
 
