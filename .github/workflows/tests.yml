@@ -3,6 +3,11 @@ on:
   pull_request:
     branches: [ master ]
 
+env:
+  TEST_IMAGE_TAG: 0.0.0-unstable
+  TEST_BALANCER_IMAGE: ghcr.io/${{ github.repository_owner }}/manticoresearch-helm-balancer
+  TEST_WORKER_IMAGE: ghcr.io/${{ github.repository_owner }}/manticoresearch-helm-worker
+
 jobs:
   build-balancer:
     concurrency:
@@ -35,7 +40,7 @@ jobs:
 
       - name: Build balancer
         if: steps.changed-files.outputs.test-only != 'true'
-        run: docker build -t manticoresearch/helm-balancer:0.0.0-unstable ./sources/manticore-balancer
+        run: docker build -t "${TEST_BALANCER_IMAGE}:${TEST_IMAGE_TAG}" ./sources/manticore-balancer
 
   build-worker:
     concurrency:
@@ -68,7 +73,7 @@ jobs:
 
       - name: Build worker
         if: steps.changed-files.outputs.test-only != 'true'
-        run: docker build -t manticoresearch/helm-worker:0.0.0-unstable ./sources/manticore-worker
+        run: docker build -t "${TEST_WORKER_IMAGE}:${TEST_IMAGE_TAG}" ./sources/manticore-worker
 
   discover:
     needs: [build-balancer, build-worker]
