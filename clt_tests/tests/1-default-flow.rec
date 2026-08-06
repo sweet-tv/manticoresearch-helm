@@ -63,5 +63,5 @@ title: dog is brown
 ––– input –––
 kubectl get deployment my-helm-manticoresearch-balancer -o=jsonpath='{$.spec.template.spec.containers[:1].image}'; echo
 ––– output –––
-manticoresearch/helm-balancer:0.0.0-unstable
+ghcr.io/sweet-tv/manticoresearch-helm-balancer:0.0.0-unstable
 ––– block: ./init/cleanup-release –––
