@@ -20,6 +20,8 @@ $configMapPath   = null;
 $workerService   = null;
 $tableHAStrategy = null;
 $agentConnection = null;
+$balancerMode    = getenv( 'BALANCER_MODE' ) ?: 'classic';
+$workerBinaryPort = (int) ( getenv( 'WORKER_BINARY_PORT' ) ?: 9312 );
 
 $variables = [
 	'workerPort'      => [ 'env' => 'WORKER_PORT', 'type' => 'int' ],
@@ -49,6 +51,16 @@ foreach ( $variables as $variable => $desc ) {
 
 if (!in_array($tableHAStrategy, ['random', 'nodeads','noerrors','roundrobin'])){
 	Logger::info( "TABLE_HA_STRATEGY can be only {random|nodeads|noerrors|roundrobin}\n" );
+	exit( 1 );
+}
+
+if (!in_array($balancerMode, ['classic', 'rt'], true)){
+	Logger::info( "BALANCER_MODE can be only {classic|rt}\n" );
+	exit( 1 );
+}
+
+if ($workerBinaryPort < 1 || $workerBinaryPort > 65535){
+	Logger::info( "WORKER_BINARY_PORT must be a valid TCP port\n" );
 	exit( 1 );
 }
 
@@ -94,7 +106,11 @@ if ( $tables !== [] ) {
 
 	if ( $previousHash !== $hash ) {
 		Logger::info( "Starting config recompiling" );
-		saveConfig( $tables, $podsIps, $balancerPort, $configMapPath, $tableHAStrategy, $agentConnection );
+		if ( $balancerMode === 'rt' ) {
+			saveRuntimeTables( $tables, $podsIps, $balancerPort, $workerBinaryPort, $tableHAStrategy, $agentConnection );
+		} else {
+			saveConfig( $tables, $podsIps, $balancerPort, $configMapPath, $tableHAStrategy, $agentConnection );
+		}
 		$cache->store( Cache::TABLE_HASH, $hash );
 	}
 } else {
@@ -116,6 +132,59 @@ function buildDistributedTableAgentValue( $table, $nodes, $agentConnection ) {
 	}
 
 	return $agent;
+}
+
+
+function buildRuntimeDistributedTableAgentValue( $table, $nodes, $port, $tableHAStrategy, $agentConnection ) {
+	$endpoints = array_map(
+		static function ( $node ) use ( $port ) {
+			return $node . ':' . $port;
+		},
+		$nodes
+	);
+	$options = [ 'ha_strategy=' . $tableHAStrategy ];
+
+	if ( $agentConnection === 'pconn' ) {
+		$options[] = 'conn=pconn';
+	}
+
+	return implode( '|', $endpoints ) . ':' . $table . '[' . implode( ',', $options ) . ']';
+}
+
+
+function quoteTableIdentifier( $table ) {
+	if ( ! preg_match( '/^[A-Za-z0-9_]+$/', $table ) ) {
+		throw new RuntimeException( 'Unsafe table name received from worker' );
+	}
+
+	return '`' . $table . '`';
+}
+
+
+function saveRuntimeTables( $tables, $nodes, $port, $workerBinaryPort, $tableHAStrategy, $agentConnection ) {
+	$balancer = new ManticoreConnector( 'localhost', $port, null, - 1 );
+	$existingTables = array_flip( $balancer->getTables( false ) );
+	$connection = new mysqli( 'localhost:' . $port, '', '', '' );
+
+	foreach ( $tables as $table ) {
+		$tableIdentifier = quoteTableIdentifier( $table );
+		$agent = buildRuntimeDistributedTableAgentValue(
+			$table,
+			$nodes,
+			$workerBinaryPort,
+			$tableHAStrategy,
+			$agentConnection
+		);
+		$escapedAgent = $connection->real_escape_string( $agent );
+
+		if ( isset( $existingTables[$table] ) ) {
+			$connection->query( "ALTER TABLE $tableIdentifier agent='$escapedAgent'" );
+		} else {
+			$connection->query( "CREATE TABLE $tableIdentifier type='distributed' agent='$escapedAgent'" );
+		}
+	}
+
+	$connection->close();
 }
 
 

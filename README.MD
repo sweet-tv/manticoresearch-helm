@@ -186,9 +186,10 @@ The balancer in Manticore Search is an optional component for managing high avai
    - To further improve HA for read operations, you can increase the number of balancer replicas by adjusting the `balancer.replicaCount` parameter in `values.yaml`.
 
 #### Configuration Options:
-- **Custom Behavior:** You can customize the balancer’s behavior using its HA strategy (`table_ha_strategy`).
-- **Enhanced Performance:** Scaling the number of balancer replicas improves the cluster’s ability to handle read requests.
+- **Custom Behavior:** You can customize the balancer's behavior using its HA strategy (`table_ha_strategy`).
+- **Enhanced Performance:** Scaling the number of balancer replicas improves the cluster's ability to handle read requests.
 - **Persistent Remote Agents:** Set `balancer.config.agent.conn` to `pconn` to generate remote agents with `[conn=pconn]`. To make persistent connections effective, also set `persistent_connections_limit` to a value greater than `0` in `balancer.config.content`.
+- **Persistent Runtime Aliases:** Set `balancer.persistence.enabled=true` when stable distributed-table definitions are changed at runtime and must survive pod or node replacement. This mode requires exactly one balancer replica and a `data_dir` in `balancer.config.content`, as shown below. The chart automatically uses a recreate strategy so only one process can access the data volume.
 
 Example:
 
@@ -208,6 +209,7 @@ balancer:
         query_log = /dev/stdout
         query_log_format = sphinxql
         pid_file = /var/run/manticore/searchd.pid
+        data_dir = /var/lib/manticore
         binlog_path = /var/lib/manticore
         shutdown_timeout = 25s
       }

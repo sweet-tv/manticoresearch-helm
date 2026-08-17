@@ -1,0 +1,33 @@
+{{- if and .Values.balancer.enabled .Values.balancer.persistence.enabled (not .Values.balancer.persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "manticoresearch.fullname" . }}-balancer-data
+  labels:
+    app.kubernetes.io/component: balancer
+    {{- include "manticoresearch.labels" . | nindent 4 }}
+  {{- with .Values.balancer.persistence.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- range .Values.balancer.persistence.accessModes }}
+    - {{ . | quote }}
+    {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.balancer.persistence.size | quote }}
+  {{ include "manticoresearch.balancer.storageClass" . }}
+  {{- if or .Values.balancer.persistence.matchLabels .Values.balancer.persistence.matchExpressions }}
+  selector:
+    {{- if .Values.balancer.persistence.matchLabels }}
+    matchLabels:
+      {{- toYaml .Values.balancer.persistence.matchLabels | nindent 6 }}
+    {{- end }}
+    {{- if .Values.balancer.persistence.matchExpressions }}
+    matchExpressions:
+      {{- toYaml .Values.balancer.persistence.matchExpressions | nindent 6 }}
+    {{- end }}
+  {{- end }}
+{{- end }}

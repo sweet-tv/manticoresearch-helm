@@ -1,4 +1,4 @@
 ––– input –––
-helm uninstall my-helm >/dev/null 2>&1 || true; kubectl delete pvc -l app.kubernetes.io/component=worker >/dev/null 2>&1 || true; echo "cleanup complete"
+helm uninstall my-helm >/dev/null 2>&1 || true; kubectl delete pvc -l app.kubernetes.io/component=worker >/dev/null 2>&1 || true; kubectl delete pvc -l app.kubernetes.io/component=balancer >/dev/null 2>&1 || true; echo "cleanup complete"
 ––– output –––
 cleanup complete

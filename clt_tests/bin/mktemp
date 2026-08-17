@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${CLT_LOCAL_TMPDIR:?CLT_LOCAL_TMPDIR is required}"
+exec /usr/bin/mktemp "$CLT_LOCAL_TMPDIR/tmp.XXXXXXXXXX"

@@ -24,6 +24,7 @@ USAGE
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 tests_dir="$repo_root/clt_tests/tests"
+clt_tmp_dir="$repo_root/clt_tests/.tmp"
 kubeconfig="$repo_root/clt_tests/k3s.yaml"
 clt_bin="$repo_root/../clt/clt"
 image="manticoresearch/helm-test-kit:0.0.1"
@@ -267,6 +268,7 @@ fi
 
 run_args="-e TELEMETRY=0 --net=host -v ${kubeconfig}:/tmp/output/kubeconfig-latest.yaml -v ${repo_root}/charts/:/.clt/charts/"
 should_exit=0
+mkdir -p "$clt_tmp_dir"
 
 for test in "${selected[@]}"; do
   rel="${test#$repo_root/}"
@@ -274,7 +276,7 @@ for test in "${selected[@]}"; do
   cmp_file="${test%.rec}.cmp"
 
   echo "Running $rel"
-  if CLT_RUN_ARGS="$run_args" "$clt_bin" "${clt_args[@]}" -t "$rel" "$image"; then
+  if CLT_LOCAL_TMPDIR="$clt_tmp_dir" PATH="$repo_root/clt_tests/bin:$PATH" CLT_RUN_ARGS="$run_args" "$clt_bin" "${clt_args[@]}" -t "$rel" "$image"; then
     exit_code=0
   else
     exit_code=$?

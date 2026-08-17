@@ -1,3 +1,9 @@
+### 28.6.7-20260817
+
+* Added optional persistent balancer state for deployments that manage runtime distributed-table aliases
+* Use a single-replica recreate strategy when balancer persistence is enabled to prevent concurrent access to the same data volume
+* Reconcile worker tables through SQL in persistent mode so runtime tables and the observer can coexist without a startup race
+
 ### 28.6.7-20260804
 
 * Switched to ManticoreSearch development version dev-28.6.7

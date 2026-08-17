@@ -1,4 +1,10 @@
 {{- if .Values.balancer.enabled }}
+{{- if and .Values.balancer.persistence.enabled (ne (int .Values.balancer.replicaCount) 1) }}
+{{- fail "balancer.persistence.enabled requires balancer.replicaCount=1" }}
+{{- end }}
+{{- if and .Values.balancer.persistence.enabled (not (regexMatch "(?m)^[[:space:]]*data_dir[[:space:]]*=" .Values.balancer.config.content)) }}
+{{- fail "balancer.persistence.enabled requires data_dir in balancer.config.content" }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -9,6 +15,10 @@ metadata:
     {{- include "manticoresearch.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.balancer.replicaCount }}
+  {{- if .Values.balancer.persistence.enabled }}
+  strategy:
+    type: Recreate
+  {{- end }}
   selector:
     matchLabels:
       app.kubernetes.io/component: balancer
@@ -76,8 +86,12 @@ spec:
             value: {{ .Values.balancer.service.ql.port | quote }}
           - name: WORKER_PORT
             value: {{ .Values.worker.service.ql.port | quote }}
+          - name: WORKER_BINARY_PORT
+            value: {{ .Values.worker.service.binary.port | quote }}
           - name: WORKER_SERVICE
             value: {{ include "manticoresearch.fullname" . }}-worker-replication-svc
+          - name: BALANCER_MODE
+            value: {{ ternary "rt" "classic" .Values.balancer.persistence.enabled | quote }}
         readinessProbe:
           {{- if .Values.balancer.readinessProbe.enabled }}
           {{- include "manticore-helm.render" (dict "value" (omit .Values.balancer.readinessProbe "enabled") "context" $) | nindent 8 }}
@@ -102,12 +116,21 @@ spec:
           - name: config-volume
             mountPath: {{ .Values.balancer.config.path }}
             subPath: manticore.conf
+          {{- if .Values.balancer.persistence.enabled }}
+          - name: data
+            mountPath: /var/lib/manticore
+          {{- end }}
         resources:
           {{- toYaml .Values.balancer.resources | nindent 10 }}
       volumes:
         - name: config-volume
           configMap:
             name: {{ include "manticoresearch.fullname" . }}-balancer-config
+        {{- if .Values.balancer.persistence.enabled }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ default (printf "%s-balancer-data" (include "manticoresearch.fullname" .)) .Values.balancer.persistence.existingClaim }}
+        {{- end }}
       {{- with .Values.balancer.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

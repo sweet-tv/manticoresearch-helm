@@ -54,6 +54,19 @@ balancer:
         binlog_path = /var/lib/manticore
         shutdown_timeout = 25s
       }
+  persistence:
+    # Persist runtime distributed-table definitions (manticore.json) across
+    # balancer pod and node replacement. Persistent mode requires one replica
+    # because multiple searchd processes must not share the same data directory.
+    enabled: false
+    existingClaim: ""
+    # storageClass: "-"
+    accessModes:
+      - ReadWriteOnce
+    size: 1Gi
+    annotations: {}
+    matchLabels: {}
+    matchExpressions: {}
   resources: {}
     # We usually recommend not to specify default resources and to leave this as a conscious
     # choice for the user. This also increases chances charts run on environments with little

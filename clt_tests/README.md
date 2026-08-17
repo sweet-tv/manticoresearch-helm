@@ -31,6 +31,9 @@ clt_tests/run-local.sh --all
 
 The runner expects `../clt/clt` and `clt_tests/k3s.yaml` by default. Override them with `--clt /path/to/clt` and `--kubeconfig /path/to/kubeconfig` if needed. `--init` can be used alone or together with a run command.
 
+The local runner keeps CLT's merged patterns file under `clt_tests/.tmp` so
+Colima can mount it as a file on macOS.
+
 To build the local Helm images and import them into the k3s container before running tests:
 
 ```bash
@@ -61,6 +64,7 @@ Scenario filenames must start with `1-`, `2-`, or `3-`. CI uses that prefix to c
 
 Current standalone scenarios:
 
+- `clt_tests/tests/1-balancer-persistence.rec`
 - `clt_tests/tests/1-default-flow.rec`
 - `clt_tests/tests/1-no-balancer-flow.rec`
 - `clt_tests/tests/2-pod-labels.rec`

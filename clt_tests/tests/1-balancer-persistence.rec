@@ -1,0 +1,64 @@
+––– block: ./init/init –––
+––– block: ./init/cleanup-release –––
+––– input –––
+printf 'balancer:\n  persistence:\n    enabled: true\n  config:\n    content: |\n      searchd\n      {\n        listen = /var/run/mysqld/mysqld.sock:mysql\n        listen = 9306:mysql\n        listen = 9308:http\n        listen = 9312\n        query_log = /dev/stdout\n        query_log_format = sphinxql\n        pid_file = /var/run/manticore/searchd.pid\n        data_dir = /var/lib/manticore\n        binlog_path = /var/lib/manticore\n        shutdown_timeout = 25s\n      }\n  image:\n    tag: 0.0.0-unstable\nworker:\n  replicaCount: 1\n  image:\n    tag: 0.0.0-unstable\n' >/tmp/clt-values.yaml; cat /tmp/clt-values.yaml
+––– output –––
+balancer:
+  persistence:
+    enabled: true
+  config:
+    content: |
+      searchd
+      {
+        listen = /var/run/mysqld/mysqld.sock:mysql
+        listen = 9306:mysql
+        listen = 9308:http
+        listen = 9312
+        query_log = /dev/stdout
+        query_log_format = sphinxql
+        pid_file = /var/run/manticore/searchd.pid
+        data_dir = /var/lib/manticore
+        binlog_path = /var/lib/manticore
+        shutdown_timeout = 25s
+      }
+  image:
+    tag: 0.0.0-unstable
+worker:
+  replicaCount: 1
+  image:
+    tag: 0.0.0-unstable
+––– block: ./init/install –––
+––– input –––
+if kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=my-helm --timeout=180s >/dev/null && [[ $(kubectl get pods -l app.kubernetes.io/instance=my-helm --no-headers | wc -l) -eq 2 ]]; then echo "OK"; else echo "Failed waiting until pods were ready"; kubectl get po -o wide || true; false; fi
+––– output –––
+OK
+––– input –––
+kubectl get deployment my-helm-manticoresearch-balancer -o jsonpath='{.spec.strategy.type}'; echo
+––– output –––
+Recreate
+––– input –––
+kubectl get pvc my-helm-manticoresearch-balancer-data -o jsonpath='{.status.phase}'; echo
+––– output –––
+Bound
+––– input –––
+kubectl exec my-helm-manticoresearch-worker-0 -- mysql -h0 -P9306 -e "CREATE TABLE persistence_source(title text); ALTER CLUSTER manticore_cluster ADD persistence_source; INSERT INTO manticore_cluster:persistence_source (title) VALUES ('survives restart');"; echo $?
+––– output –––
+0
+––– input –––
+export BALANCER_NAME=$(kubectl get pods -l "app.kubernetes.io/name=manticoresearch,app.kubernetes.io/instance=my-helm,app.kubernetes.io/component=balancer" -o jsonpath="{.items[0].metadata.name}"); if timeout 180 bash -c 'until kubectl exec "$BALANCER_NAME" -- mysql -h0 -P9306 -e "SHOW TABLES" 2>/dev/null | grep -q persistence_source; do sleep 2; done'; then echo "source visible"; else echo "source missing"; false; fi
+––– output –––
+source visible
+––– input –––
+kubectl exec "$BALANCER_NAME" -- mysql --skip-table --silent --skip-column-names --raw -h0 -P9306 -e "CREATE TABLE stable_alias type='distributed' agent_persistent='my-helm-manticoresearch-worker-svc:9312:persistence_source[conn=pconn]'; SELECT title FROM stable_alias;"
+––– output –––
+survives restart
+––– input –––
+export OLD_BALANCER_UID=$(kubectl get pod "$BALANCER_NAME" -o jsonpath='{.metadata.uid}'); kubectl delete pod "$BALANCER_NAME" --wait=false >/dev/null; if timeout 300 bash -c 'while true; do new_name=$(kubectl get pods -l "app.kubernetes.io/name=manticoresearch,app.kubernetes.io/instance=my-helm,app.kubernetes.io/component=balancer" -o jsonpath="{.items[0].metadata.name}" 2>/dev/null); new_uid=$(kubectl get pod "$new_name" -o jsonpath="{.metadata.uid}" 2>/dev/null); ready=$(kubectl get pod "$new_name" -o jsonpath="{.status.conditions[?(@.type==\"Ready\")].status}" 2>/dev/null); if [[ -n "$new_name" && "$new_uid" != "$OLD_BALANCER_UID" && "$ready" == "True" ]]; then exit 0; fi; sleep 2; done'; then echo "balancer replaced and ready"; else kubectl get pods -o wide; false; fi
+––– output –––
+balancer replaced and ready
+––– input –––
+export BALANCER_NAME=$(kubectl get pods -l "app.kubernetes.io/name=manticoresearch,app.kubernetes.io/instance=my-helm,app.kubernetes.io/component=balancer" -o jsonpath="{.items[0].metadata.name}"); kubectl exec "$BALANCER_NAME" -- mysql --skip-table --silent --skip-column-names --raw -h0 -P9306 -e "SHOW CREATE TABLE stable_alias; SELECT title FROM stable_alias;" | grep -E "agent_persistent|survives restart"
+––– output –––
+stable_alias	CREATE TABLE stable_alias type='distributed' agent_persistent='my-helm-manticoresearch-worker-svc:9312:persistence_source[conn=pconn]'
+survives restart
+––– block: ./init/cleanup-release –––
