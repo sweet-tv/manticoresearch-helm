@@ -10,14 +10,14 @@ Builds the Helm worker and balancer images with the local CI tag and imports
 them into the local k3s container created by clt_tests/run-local.sh --init.
 
 Options:
-  --tag             Image tag. Default: 0.0.0-unstable
+  --tag             Image tag. Default: ci-local
   --k3s-container   k3s container name. Default: k3s
   --no-import       Build Docker images but do not import them into k3s.
 USAGE
 }
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-tag="0.0.0-unstable"
+tag="ci-local"
 k3s_container="k3s"
 do_import=1
 
@@ -47,18 +47,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-worker_image="ghcr.io/sweet-tv/manticoresearch-helm-worker:${tag}"
-balancer_image="ghcr.io/sweet-tv/manticoresearch-helm-balancer:${tag}"
-legacy_worker_image="manticoresearch/helm-worker:${tag}"
-legacy_balancer_image="manticoresearch/helm-balancer:${tag}"
+worker_image="manticoresearch/helm-worker:${tag}"
+balancer_image="manticoresearch/helm-balancer:${tag}"
 
 echo "Building $worker_image"
 docker build -t "$worker_image" "$repo_root/sources/manticore-worker"
-docker tag "$worker_image" "$legacy_worker_image"
 
 echo "Building $balancer_image"
 docker build -t "$balancer_image" "$repo_root/sources/manticore-balancer"
-docker tag "$balancer_image" "$legacy_balancer_image"
 
 if [[ "$do_import" -eq 0 ]]; then
   exit 0
@@ -71,7 +67,7 @@ if ! docker inspect "$k3s_container" >/dev/null 2>&1; then
 fi
 
 echo "Importing images into k3s container: $k3s_container"
-docker save "$worker_image" "$balancer_image" "$legacy_worker_image" "$legacy_balancer_image" | docker exec -i "$k3s_container" ctr -n k8s.io images import -
+docker save "$worker_image" "$balancer_image" | docker exec -i "$k3s_container" ctr -n k8s.io images import -
 
 echo "Imported:"
-docker exec "$k3s_container" ctr -n k8s.io images ls | grep -E "(manticoresearch/helm-(worker|balancer)|ghcr.io/sweet-tv/manticoresearch-helm-(worker|balancer)):${tag}" || true
+docker exec "$k3s_container" ctr -n k8s.io images ls | grep -E "manticoresearch/helm-(worker|balancer):${tag}" || true

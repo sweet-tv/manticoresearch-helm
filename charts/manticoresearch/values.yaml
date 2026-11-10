@@ -68,6 +68,9 @@ balancer:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  ## Each probe accepts one native Kubernetes handler: exec, httpGet,
+  ## tcpSocket, or grpc. When no handler is set, the chart checks the
+  ## balancer QL port with the historical tcpSocket handler.
   livenessProbe:
     enabled: true
     failureThreshold: 3
@@ -77,6 +80,8 @@ balancer:
     timeoutSeconds: 1
   readinessProbe:
     enabled: true
+    # exec:
+    #   command: ["/bin/sh", "-ec", "your readiness check"]
     failureThreshold: 3
     initialDelaySeconds: 5
     periodSeconds: 3
@@ -110,6 +115,16 @@ worker:
     ## Only long-form flags are allowed: --flag or --flag=value.
     ## Example: ["--force-preread"]
     extraArgs: []
+  mlock:
+    ## Add CAP_IPC_LOCK to the worker container when Manticore config uses
+    ## access_* = mlock. Kubernetes pod memory limits do not increase the
+    ## process locked-memory limit by themselves, so mlock() may otherwise fail
+    ## with "Cannot allocate memory" even when plenty of RAM is available.
+    enabled: false
+    ## Fail helm rendering when worker.config.content contains access_* = mlock
+    ## but neither worker.mlock.enabled nor securityContext.capabilities.add
+    ## includes IPC_LOCK.
+    validate: true
   image:
     repository: ghcr.io/sweet-tv/manticoresearch-helm-worker
 #    tag: 3.6.0.0
@@ -134,6 +149,15 @@ worker:
     ##   GKE, AWS & OpenStack)
     ##
     # storageClass: "-"
+    ## Optional VolumeAttributesClass to apply to the PVC.
+    ## Leave empty to omit the field entirely.
+    # volumeAttributesClassName: ""
+    ## Extra labels merged onto the PVC's default labels (app, release,
+    ## heritage, app.kubernetes.io/component).
+    ## Example:
+    ## extraLabels:
+    ##   Layer: manticore-realtime
+    extraLabels: {}
     accessModes:
       - ReadWriteOnce
     size: 10Gi
@@ -270,6 +294,8 @@ podSecurityContext: {}
 
 securityContext: {}
   # capabilities:
+  #   add:
+  #   - IPC_LOCK # Required when worker.config.content uses access_* = mlock.
   #   drop:
   #   - ALL
   # readOnlyRootFilesystem: true

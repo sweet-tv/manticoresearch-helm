@@ -7,9 +7,8 @@ Usage:
   clt_tests/run-local.sh --init
   clt_tests/run-local.sh --list
   clt_tests/run-local.sh --all
-  clt_tests/run-local.sh --thread 1
-  clt_tests/run-local.sh --test 3-sst-scale-replication
-  clt_tests/run-local.sh --test clt_tests/tests/3-sst-scale-replication.rec
+  clt_tests/run-local.sh --test sst-scale-replication
+  clt_tests/run-local.sh --test clt_tests/tests/sst-scale-replication.rec
 
 Options:
   --init          Recreate local k3s and build the CLT test-kit image.
@@ -17,6 +16,7 @@ Options:
   --kubeconfig   Kubeconfig to mount. Default: clt_tests/k3s.yaml
   --clt          Path to CLT binary. Default: ../clt/clt
   --image        Test-kit image. Default: manticoresearch/helm-test-kit:0.0.1
+  --image-tag    Worker/balancer image tag. Default: ci-local
   --build-images Build and import local worker/balancer images before running.
   --k3s-container k3s container name for image import. Default: k3s
 USAGE
@@ -27,6 +27,7 @@ tests_dir="$repo_root/clt_tests/tests"
 kubeconfig="$repo_root/clt_tests/k3s.yaml"
 clt_bin="$repo_root/../clt/clt"
 image="manticoresearch/helm-test-kit:0.0.1"
+image_tag="ci-local"
 k3s_container="k3s"
 mode=""
 selector=""
@@ -132,12 +133,6 @@ while [[ $# -gt 0 ]]; do
       mode="all"
       shift
       ;;
-    --thread)
-      require_value "$1" "${2:-}"
-      mode="thread"
-      selector="$2"
-      shift 2
-      ;;
     --test)
       require_value "$1" "${2:-}"
       mode="test"
@@ -161,6 +156,11 @@ while [[ $# -gt 0 ]]; do
     --image)
       require_value "$1" "${2:-}"
       image="$2"
+      shift 2
+      ;;
+    --image-tag)
+      require_value "$1" "${2:-}"
+      image_tag="$2"
       shift 2
       ;;
     --build-images)
@@ -199,13 +199,12 @@ fi
 tests=()
 while IFS= read -r test; do
   tests+=("$test")
-done < <(find "$tests_dir" -maxdepth 1 -type f -name '[1-3]-*.rec' | sort)
+done < <(find "$tests_dir" -maxdepth 1 -type f -name '*.rec' | sort)
 
 if [[ "$mode" == "list" ]]; then
   for test in "${tests[@]}"; do
     rel="${test#$repo_root/}"
-    thread="$(basename "$test" | cut -d- -f1)"
-    printf 'thread %s  %s\n' "$thread" "$rel"
+    printf '%s\n' "$rel"
   done
   exit 0
 fi
@@ -223,24 +222,13 @@ if [[ ! -f "$kubeconfig" ]]; then
 fi
 
 if [[ "$build_images" -eq 1 ]]; then
-  "$repo_root/clt_tests/build-images-local.sh" --k3s-container "$k3s_container"
+  "$repo_root/clt_tests/build-images-local.sh" --tag "$image_tag" --k3s-container "$k3s_container"
 fi
 
 selected=()
 case "$mode" in
   all)
     selected=("${tests[@]}")
-    ;;
-  thread)
-    if [[ ! "$selector" =~ ^[1-3]$ ]]; then
-      echo "--thread expects 1, 2, or 3" >&2
-      exit 2
-    fi
-    for test in "${tests[@]}"; do
-      if [[ "$(basename "$test")" == "$selector"-* ]]; then
-        selected+=("$test")
-      fi
-    done
     ;;
   test)
     name="$selector"
@@ -265,7 +253,22 @@ if [[ "$debug" -eq 1 ]]; then
   clt_args+=(-d)
 fi
 
-run_args="-e TELEMETRY=0 --net=host -v ${kubeconfig}:/tmp/output/kubeconfig-latest.yaml -v ${repo_root}/charts/:/.clt/charts/"
+ci_images_file="$(mktemp)"
+trap 'rm -f "$ci_images_file"' EXIT
+printf '%s\n' \
+  'worker:' \
+  '  image:' \
+  '    repository: manticoresearch/helm-worker' \
+  "    tag: ${image_tag}" \
+  '    pullPolicy: Never' \
+  'balancer:' \
+  '  image:' \
+  '    repository: manticoresearch/helm-balancer' \
+  "    tag: ${image_tag}" \
+  '    pullPolicy: Never' \
+  > "$ci_images_file"
+
+run_args="-e TELEMETRY=0 --net=host -v ${kubeconfig}:/tmp/output/kubeconfig-latest.yaml -v ${repo_root}/charts/:/.clt/charts/ -v ${ci_images_file}:/tmp/clt-ci-images.yaml:ro"
 should_exit=0
 
 for test in "${selected[@]}"; do

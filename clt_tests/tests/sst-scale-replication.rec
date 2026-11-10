@@ -1,6 +1,6 @@
 ––– block: ./init/init –––
 ––– input –––
-worker_pvcs=$(kubectl get pvc -l app.kubernetes.io/component=worker --no-headers 2>/dev/null | wc -l | tr -d " "); helm uninstall my-helm >/dev/null 2>&1 || true; kubectl delete pvc -l app.kubernetes.io/component=worker >/dev/null 2>&1 || true; echo "cleanup requested worker_pvcs=$worker_pvcs"
+worker_pvcs=$(kubectl get pvc -l app.kubernetes.io/component=worker --no-headers 2>/dev/null | wc -l | tr -d " "); if helm status my-helm >/dev/null 2>&1; then helm uninstall my-helm --wait --timeout 180s >/dev/null; fi; claims="$(kubectl get pvc -l app.kubernetes.io/component=worker -o name)"; if [[ -n "$claims" ]]; then kubectl delete $claims --wait --timeout=180s >/dev/null; fi; echo "cleanup requested worker_pvcs=$worker_pvcs"
 ––– output –––
 #!/cleanup requested worker_pvcs=[0-9]+/!#
 ––– input –––
@@ -8,7 +8,7 @@ timeout 300 bash -c 'while kubectl get pod 2>/dev/null | grep -q "^my-helm-"; do
 ––– output –––
 cleanup complete
 ––– input –––
-printf 'balancer:\n  enabled: false\nworker:\n  replicaCount: 1\n  persistence:\n    size: 10Gi\n  image:\n    tag: 0.0.0-unstable\n' >/tmp/clt-values.yaml; cat /tmp/clt-values.yaml
+printf 'balancer:\n  enabled: false\nworker:\n  replicaCount: 1\n  persistence:\n    size: 10Gi\n  image:\n    tag: ci-local\n' >/tmp/clt-values.yaml; cat /tmp/clt-values.yaml
 ––– output –––
 balancer:
   enabled: false
@@ -17,7 +17,7 @@ worker:
   persistence:
     size: 10Gi
   image:
-    tag: 0.0.0-unstable
+    tag: ci-local
 ––– block: ./init/install –––
 ––– input –––
 if timeout 420 bash -c 'until kubectl get pod my-helm-manticoresearch-worker-0 2>/dev/null | grep -q "1/1[[:space:]]*Running"; do sleep 2; done'; then kubectl get pod my-helm-manticoresearch-worker-0; else echo "worker_0_wait_failed"; kubectl get pod my-helm-manticoresearch-worker-0 2>/dev/null || true; kubectl describe pod my-helm-manticoresearch-worker-0 2>/dev/null || true; false; fi
@@ -91,7 +91,7 @@ uuid_before=$(cat /tmp/manticore-cluster-uuid-before); seqno_before=$(cat /tmp/m
 #!/my-helm-manticoresearch-worker-0 cluster_uuid_after=[0-9a-f-]+ cluster_seqno_after=[0-9]+/!#
 #!/my-helm-manticoresearch-worker-1 cluster_uuid_after=[0-9a-f-]+ cluster_seqno_after=[0-9]+/!#
 ––– input –––
-worker_pvcs=$(kubectl get pvc -l app.kubernetes.io/component=worker --no-headers 2>/dev/null | wc -l | tr -d " "); helm uninstall my-helm; kubectl delete pvc -l app.kubernetes.io/component=worker >/dev/null 2>&1; echo "worker_pvcs_deleted=$worker_pvcs"
+worker_pvcs=$(kubectl get pvc -l app.kubernetes.io/component=worker --no-headers 2>/dev/null | wc -l | tr -d " "); helm uninstall my-helm --wait --timeout 180s; claims="$(kubectl get pvc -l app.kubernetes.io/component=worker -o name)"; if [[ -n "$claims" ]]; then kubectl delete $claims --wait --timeout=180s >/dev/null; fi; echo "worker_pvcs_deleted=$worker_pvcs"
 ––– output –––
 release "my-helm" uninstalled
 #!/worker_pvcs_deleted=[0-9]+/!#
