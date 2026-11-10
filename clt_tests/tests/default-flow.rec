@@ -20,7 +20,7 @@ if timeout 180 bash -c 'while [[ ! $(kubectl get po 2>&1 | grep "Running" | wc -
 ––– output –––
 OK
 ––– input –––
-for ordinal in 0 1 2; do pod="my-helm-manticoresearch-worker-$ordinal"; expected=$((ordinal + 1)); actual=$(kubectl exec "$pod" -- awk '$1 == "server_id" {print $3; exit}' /etc/manticoresearch/manticore.conf); echo "$pod server_id=$actual"; test "$actual" = "$expected" || exit 1; done
+server_id_check_failed=0; for ordinal in 0 1 2; do pod="my-helm-manticoresearch-worker-$ordinal"; expected=$((ordinal + 1)); actual=$(kubectl exec "$pod" -- bash /etc/manticoresearch/manticore.conf | awk '$1 == "server_id" {print $3; exit}'); echo "$pod server_id=$actual"; test "$actual" = "$expected" || server_id_check_failed=1; done; test "$server_id_check_failed" -eq 0
 ––– output –––
 my-helm-manticoresearch-worker-0 server_id=1
 my-helm-manticoresearch-worker-1 server_id=2
