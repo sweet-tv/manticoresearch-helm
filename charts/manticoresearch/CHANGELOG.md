@@ -1,3 +1,7 @@
+### 28.6.7-20261110
+
+* Allow balancer probes to override the default TCP handler
+
 ### 28.6.7-20260804
 
 * Switched to ManticoreSearch development version dev-28.6.7

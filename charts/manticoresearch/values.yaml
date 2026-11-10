@@ -68,6 +68,9 @@ balancer:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  ## Each probe accepts one native Kubernetes handler: exec, httpGet,
+  ## tcpSocket, or grpc. When no handler is set, the chart checks the
+  ## balancer QL port with the historical tcpSocket handler.
   livenessProbe:
     enabled: true
     failureThreshold: 3
@@ -77,6 +80,8 @@ balancer:
     timeoutSeconds: 1
   readinessProbe:
     enabled: true
+    # exec:
+    #   command: ["/bin/sh", "-ec", "your readiness check"]
     failureThreshold: 3
     initialDelaySeconds: 5
     periodSeconds: 3

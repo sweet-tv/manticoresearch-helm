@@ -63,6 +63,8 @@ Current standalone scenarios:
 
 - `clt_tests/tests/1-default-flow.rec`
 - `clt_tests/tests/1-no-balancer-flow.rec`
+- `clt_tests/tests/2-balancer-agent-pconn.rec`
+- `clt_tests/tests/2-balancer-custom-probes.rec`
 - `clt_tests/tests/2-pod-labels.rec`
 - `clt_tests/tests/2-searchd-extra-args.rec`
 - `clt_tests/tests/2-stopwords-flow.rec`

@@ -1,0 +1,11 @@
+––– block: ./init/init –––
+––– block: ./init/cleanup-release –––
+––– input –––
+printf 'balancer:\n  readinessProbe:\n    enabled: true\n    exec:\n      command:\n        - /bin/sh\n        - -ec\n        - echo ready\n' >/tmp/clt-values.yaml; helm template custom ./charts/manticoresearch -f /tmp/clt-values.yaml --show-only templates/manticore-balancer.yaml | kubectl apply --dry-run=client -f - -o jsonpath='{.spec.template.spec.containers[0].readinessProbe.exec.command} {.spec.template.spec.containers[0].readinessProbe.tcpSocket.port} {.spec.template.spec.containers[0].livenessProbe.tcpSocket.port}{"\\n"}'
+––– output –––
+[/bin/sh -ec echo ready]  9306
+––– input –––
+printf 'balancer:\n  readinessProbe:\n    exec:\n      command: [true]\n    httpGet:\n      path: /\n      port: 9308\n' >/tmp/clt-values.yaml; if helm template invalid ./charts/manticoresearch -f /tmp/clt-values.yaml >/tmp/custom-probes-invalid.yaml 2>/tmp/custom-probes-invalid.err; then cat /tmp/custom-probes-invalid.yaml; false; else grep -q 'balancer.readinessProbe must configure only one of exec, httpGet, tcpSocket, or grpc' /tmp/custom-probes-invalid.err && echo "conflicting readiness handlers rejected"; fi
+––– output –––
+conflicting readiness handlers rejected
+––– block: ./init/cleanup-release –––
