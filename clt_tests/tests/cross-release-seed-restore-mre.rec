@@ -10,7 +10,7 @@ printf 'balancer:\n  enabled: false\nworker:\n  replicaCount: 2\n  persistence:\
 ––– output –––
 values_written=old2_new1
 ––– input –––
-helm install seed-old -f /tmp/seed-old-values.yaml ./charts/manticoresearch >/tmp/seed-old-install.log 2>&1 && echo "release=seed-old status=deployed"
+values_args=(-f /tmp/seed-old-values.yaml); test -f /tmp/clt-ci-images.yaml && values_args+=(-f /tmp/clt-ci-images.yaml); helm install seed-old "${values_args[@]}" ./charts/manticoresearch >/tmp/seed-old-install.log 2>&1 && echo "release=seed-old status=deployed"
 ––– output –––
 release=seed-old status=deployed
 ––– input –––
@@ -121,7 +121,7 @@ nodes:
 #!/seed-old-manticoresearch-worker-[01].*/!#
 grastate:
 ––– input –––
-helm install seed-new -f /tmp/seed-new-values.yaml ./charts/manticoresearch >/tmp/seed-new-install.log 2>&1 && echo "release=seed-new status=deployed" || { cat /tmp/seed-new-install.log; exit 1; }
+values_args=(-f /tmp/seed-new-values.yaml); test -f /tmp/clt-ci-images.yaml && values_args+=(-f /tmp/clt-ci-images.yaml); helm install seed-new "${values_args[@]}" ./charts/manticoresearch >/tmp/seed-new-install.log 2>&1 && echo "release=seed-new status=deployed" || { cat /tmp/seed-new-install.log; exit 1; }
 ––– output –––
 release=seed-new status=deployed
 ––– input –––
