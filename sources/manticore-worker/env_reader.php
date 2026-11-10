@@ -9,6 +9,8 @@ $variables = [
     'replicationMode' => ['env' => 'REPLICATION_MODE', 'type' => 'string'],
     'autoAddTablesIntoCluster' => ['env' => 'AUTO_ADD_TABLES_IN_CLUSTER', 'type' => 'bool'],
     'isBalancerEnabled' => ['env' => 'IS_BALANCER_ENABLED', 'type' => 'bool'],
+    'quorumRecovery' => ['env' => 'QUORUM_RECOVERY', 'type' => 'bool'],
+    'quorumCheckInterval' => ['env' => 'QUORUM_RUN_INTERVAL', 'type' => 'int'],
     'logLevel' => ['env' => 'LOG_LEVEL', 'type' => 'level'],
 ];
 
@@ -30,7 +32,11 @@ foreach ($variables as $variable => $desc) {
     } elseif ($desc['type'] === 'level') {
         $$variable = \Monolog\Logger::toMonologLevel($$variable);
     } elseif ($desc['type'] === 'bool') {
-        $$variable = (bool)$$variable;
+        $$variable = filter_var($$variable, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        if ($$variable === null) {
+            \Core\Logger\Logger::error($desc['env']." must be a boolean\n");
+            exit(1);
+        }
     }
 }
 

@@ -9,7 +9,14 @@ metadata:
   labels:
     app: {{ template "manticoresearch.name" . }}
     {{- include "manticoresearch.labels" . | nindent 4 }}
+    {{- with .Values.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
+  {{- with .Values.serviceMonitor.namespaceSelector }}
+  namespaceSelector:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   endpoints:
     - port: metrics
       path: {{ index .Values.exporter.annotations "prometheus.io/path" }}

@@ -1,0 +1,20 @@
+{{- if .Values.prometheusRule.enabled }}
+{{- if empty .Values.prometheusRule.groups }}
+{{- fail "prometheusRule.groups must contain at least one rule group when prometheusRule.enabled is true" }}
+{{- end }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "manticoresearch.fullname" . }}
+  {{- with .Values.prometheusRule.namespace }}
+  namespace: {{ . }}
+  {{- end }}
+  labels:
+    {{- include "manticoresearch.labels" . | nindent 4 }}
+    {{- with .Values.prometheusRule.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    {{- toYaml .Values.prometheusRule.groups | nindent 4 }}
+{{- end }}

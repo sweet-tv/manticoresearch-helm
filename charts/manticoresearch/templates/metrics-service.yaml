@@ -1,4 +1,7 @@
 {{- if .Values.serviceMonitor.enabled  }}
+{{- if and .Values.serviceMonitor.targetComponent (not (has .Values.serviceMonitor.targetComponent (list "worker" "balancer"))) }}
+{{- fail "serviceMonitor.targetComponent must be empty, worker, or balancer" }}
+{{- end }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -13,4 +16,7 @@ spec:
       targetPort: {{ index .Values.exporter.annotations "prometheus.io/port" }}
   selector:
     app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- with .Values.serviceMonitor.targetComponent }}
+    app.kubernetes.io/component: {{ . | quote }}
+    {{- end }}
 {{- end  }}

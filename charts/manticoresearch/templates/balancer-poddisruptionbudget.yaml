@@ -1,0 +1,15 @@
+{{- if and .Values.balancer.enabled .Values.balancer.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "manticoresearch.fullname" . }}-balancer
+  labels:
+    app.kubernetes.io/component: balancer
+    {{- include "manticoresearch.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.balancer.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: balancer
+      {{- include "manticoresearch.selectorLabels" . | nindent 6 }}
+{{- end }}

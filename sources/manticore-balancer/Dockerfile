@@ -1,4 +1,4 @@
-FROM manticoresearch/manticore:29.9.0
+FROM manticoresearch/manticore:dev-28.6.7@sha256:892579b1a2344127c79b1608edf441dbbb17c90aad209114b1f1049007781603
 
 RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections && apt --fix-broken install -y && \
 apt-get update && apt -y install software-properties-common && add-apt-repository -y ppa:ondrej/php && apt-get update && \

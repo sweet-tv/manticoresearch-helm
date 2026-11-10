@@ -68,6 +68,9 @@ balancer:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 1
   ## Each probe accepts one native Kubernetes handler: exec, httpGet,
   ## tcpSocket, or grpc. When no handler is set, the chart checks the
   ## balancer QL port with the historical tcpSocket handler.
@@ -97,6 +100,10 @@ balancer:
 
 worker:
   replicaCount: 3
+  ## Use OnDelete when Manticore versions must be upgraded with an explicit
+  ## stop-all/start-all maintenance procedure instead of a rolling update.
+  updateStrategy:
+    type: RollingUpdate
   ## Labels to add only to worker pods. These labels are merged with podLabels.
   ## Example:
   ## podLabels:
@@ -108,6 +115,11 @@ worker:
 
   ## The `master-slave` mode expects that you write only to node 0, so it's guaranteed to always have the most actual data. Then in case the cluster is fully shut down and then back up all other nodes will connect to the node 0.
   replicationMode: multi-master
+  ## Automatically bootstrap a non-primary cluster from worker 0. This is
+  ## intentionally supported only in master-slave mode to avoid split brain.
+  quorumRecovery: false
+  ## Interval in seconds between quorum health checks.
+  quorumCheckInterval: 15
   autoAddTablesInCluster: true
   logLevel: INFO
   searchd:
@@ -235,6 +247,9 @@ worker:
     timeoutSeconds: 5
   readinessProbe:
     enabled: true
+    ## Keep a worker out of Services and balancer discovery until these local
+    ## tables have arrived through SST or another bootstrap mechanism.
+    requiredTables: []
     failureThreshold: 3
     initialDelaySeconds: 5
     periodSeconds: 5
@@ -266,6 +281,17 @@ serviceMonitor:
   interval: 30s
   # Set timeout for scrape
   scrapeTimeout: 10s
+  ## Restrict the metrics Service to one component. Use "balancer" for
+  ## query-path health and queue metrics; leave empty for legacy behavior.
+  targetComponent: ""
+  labels: {}
+  namespaceSelector: {}
+
+prometheusRule:
+  enabled: false
+  # namespace: monitoring
+  labels: {}
+  groups: []
 
 optimize:
   enabled: false

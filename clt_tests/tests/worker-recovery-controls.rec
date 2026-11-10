@@ -1,0 +1,32 @@
+––– block: ./init/init –––
+––– input –––
+printf 'worker:\n  updateStrategy:\n    type: OnDelete\n  readinessProbe:\n    requiredTables:\n      - movies\n      - people\n' >/tmp/clt-values.yaml; helm template recovery ./charts/manticoresearch -f /tmp/clt-values.yaml --show-only templates/manticore-worker.yaml >/tmp/recovery-worker.yaml; strategy=$(kubectl apply --dry-run=client -f /tmp/recovery-worker.yaml -o jsonpath='{.spec.updateStrategy.type}'); command=$(kubectl apply --dry-run=client -f /tmp/recovery-worker.yaml -o jsonpath='{.spec.template.spec.containers[0].readinessProbe.exec.command[2]}'); echo "$command" | grep -Fq 'REQUIRED_TABLES="movies people"'; echo "strategy=$strategy required_tables=movies,people"
+––– output –––
+strategy=OnDelete required_tables=movies,people
+––– input –––
+printf 'worker:\n  readinessProbe:\n    requiredTables: ["movies; DROP TABLE movies"]\n' >/tmp/clt-values.yaml; if helm template invalid ./charts/manticoresearch -f /tmp/clt-values.yaml >/tmp/required-tables-invalid.yaml 2>/tmp/required-tables-invalid.err; then cat /tmp/required-tables-invalid.yaml; false; else grep -q 'Invalid worker.readinessProbe.requiredTables value' /tmp/required-tables-invalid.err && echo "invalid table rejected"; fi
+––– output –––
+invalid table rejected
+––– input –––
+printf 'worker:\n  replicationMode: master-slave\n  quorumRecovery: true\n  quorumCheckInterval: 30\n' >/tmp/clt-values.yaml; helm template recovery ./charts/manticoresearch -f /tmp/clt-values.yaml --show-only templates/manticore-worker.yaml | grep -E 'name: QUORUM_RECOVERY|value: "true"|name: QUORUM_RUN_INTERVAL|value: "30"' | sed 's/^[[:space:]-]*//'
+––– output –––
+name: QUORUM_RECOVERY
+value: "true"
+name: QUORUM_RUN_INTERVAL
+value: "30"
+––– input –––
+printf 'worker:\n  replicationMode: multi-master\n  quorumRecovery: true\n' >/tmp/clt-values.yaml; if helm template invalid ./charts/manticoresearch -f /tmp/clt-values.yaml >/tmp/quorum-invalid.yaml 2>/tmp/quorum-invalid.err; then cat /tmp/quorum-invalid.yaml; false; else grep -q 'worker.quorumRecovery is supported only with worker.replicationMode=master-slave' /tmp/quorum-invalid.err && echo "unsafe quorum mode rejected"; fi
+––– output –––
+unsafe quorum mode rejected
+––– input –––
+printf 'worker:\n  replicationMode: master-slave\n  quorumRecovery: true\n  quorumCheckInterval: 0\n' >/tmp/clt-values.yaml; if helm template invalid ./charts/manticoresearch -f /tmp/clt-values.yaml >/tmp/quorum-interval-invalid.yaml 2>/tmp/quorum-interval-invalid.err; then cat /tmp/quorum-interval-invalid.yaml; false; else grep -q 'worker.quorumCheckInterval must be greater than zero' /tmp/quorum-interval-invalid.err && echo "invalid quorum interval rejected"; fi
+––– output –––
+invalid quorum interval rejected
+––– input –––
+printf 'balancer:\n  podDisruptionBudget:\n    enabled: true\n    minAvailable: 2\nserviceMonitor:\n  enabled: true\n  targetComponent: balancer\n  labels:\n    release: monitoring\nprometheusRule:\n  enabled: true\n  labels:\n    release: monitoring\n  groups:\n    - name: manticore\n      rules: []\n' >/tmp/clt-values.yaml; rendered=$(helm template recovery ./charts/manticoresearch -f /tmp/clt-values.yaml); echo "$rendered" | grep -q 'kind: PodDisruptionBudget'; echo "$rendered" | grep -q 'minAvailable: 2'; echo "$rendered" | grep -q 'app.kubernetes.io/component: "balancer"'; count=$(echo "$rendered" | grep -c 'release: monitoring'); echo "pdb=enabled metrics=balancer monitoring_labels=$count"
+––– output –––
+pdb=enabled metrics=balancer monitoring_labels=2
+––– input –––
+printf 'serviceMonitor:\n  enabled: true\n  targetComponent: typo\n' >/tmp/clt-values.yaml; if helm template invalid ./charts/manticoresearch -f /tmp/clt-values.yaml >/tmp/metrics-target-invalid.yaml 2>/tmp/metrics-target-invalid.err; then cat /tmp/metrics-target-invalid.yaml; false; else grep -q 'serviceMonitor.targetComponent must be empty, worker, or balancer' /tmp/metrics-target-invalid.err && echo "invalid metrics target rejected"; fi
+––– output –––
+invalid metrics target rejected

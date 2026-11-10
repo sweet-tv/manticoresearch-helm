@@ -250,7 +250,7 @@ The Manticore Search Helm chart supports two replication modes: **master-to-mast
 In this mode, a worker pod connects to the oldest node in the cluster. Write queries are routed through the service and load-balanced across all workers, providing **high availability for writes**.
 
 - **Advantages:** This mode is recommended for most use cases as it ensures that writes are distributed among all active nodes.
-- **Potential Risk:** In scenarios involving a complete cluster shutdown and with `quorumRecovery` enabled, data loss can occur if writes are made to different workers during downtime. For example, if worker 0 stops but writes continue to worker 1, and then worker 1 stops while writes are directed to worker 2, restarting the cluster from worker 0 may result in the loss of the writes made to workers 1 and 2.
+- **Recovery:** Automatic quorum recovery is intentionally not available in this mode. Recover a fully stopped multi-master cluster manually after selecting the authoritative replica.
 
 #### Master-to-Slave Replication Mode
 
@@ -263,12 +263,10 @@ Note: This mode is not available if the Manticore Load Balancer is disabled.
 
 ### What Is `quorumRecovery`?
 
-`quorumRecovery` addresses scenarios where a cluster loses a majority of its nodes, leading to a loss of quorum and blocking writes.
+`quorumRecovery` addresses a complete quorum loss in `master-slave` mode, where worker 0 is the authoritative writer.
 
-- When `quorumRecovery: true` is set, Manticore automatically attempts to recover the quorum by reinitializing the cluster from the oldest worker or worker 0, depending on the replication mode.
-
-#### Master to master quorum recovery
-![Master to Master quorum recovery scheme](m2m_quorum.jpg)
+- When `quorumRecovery: true` is set, worker 0 checks for a non-primary cluster and attempts to bootstrap it. The chart rejects this option in `multi-master` mode to avoid selecting an authoritative replica automatically and creating split-brain.
+- Set `worker.readinessProbe.requiredTables` to every local table that must be present before a worker may receive traffic. The balancer discovers only Ready workers, so an SST-incomplete or otherwise incomplete replica stays out of its generated agent lists.
 
 #### Master to slave quorum recovery
 ![Master to slave quorum recovery scheme](m2s_quorum.jpg)
@@ -408,7 +406,11 @@ worker:
 | worker.podLabels | Additional labels added only to worker pods. Merged with `podLabels`. Useful for external traffic selectors such as `appgroup: manticore-indexes`. | {} |
 | worker.replicationMode | Workers replication mode                                                                                                  | master-slave                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | worker.clusterName | Name of replication cluster                                                                                               | manticore                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| worker.updateStrategy | StatefulSet update strategy. Use `OnDelete` for controlled stop-all/start-all Manticore upgrades. | `RollingUpdate` |
+| worker.quorumRecovery | Bootstrap a non-primary cluster from worker 0. Supported only with `master-slave`. | false |
+| worker.quorumCheckInterval | Seconds between quorum health checks. | 15 |
 | worker.searchd.extraArgs | Extra command-line arguments appended to the worker `searchd` process. Only long-form flags are allowed: `--flag` or `--flag=value` | []                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| worker.readinessProbe.requiredTables | Local tables that must exist before a worker becomes Ready. | [] |
 | worker.persistence.size | Worker max storage size (mounted volume)                                                                                  | 1Gi                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | worker.persistence.storageClass | Worker storage class                                                                                                      | -                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | worker.persistence.volumeAttributesClassName | Optional Kubernetes VolumeAttributesClass assigned to worker PVCs. Requires a compatible CSI driver. | unset |
@@ -440,12 +442,14 @@ worker:
 | balancer.config.path                 | Path to balancer config                                                                             | /mnt/configmap.conf                                                                                |
 | balancer.config.table_ha_strategy    | Distributed indexes HA strategy                                                                     | nodeads                                                                                            |
 | balancer.resources                   | Allows to set resources for balancer like mem or cpu requests and limits (see k8s docs for details) | {}                                                                                                 |
+| balancer.podDisruptionBudget.enabled | Create a PodDisruptionBudget for balancer pods. | false |
+| balancer.podDisruptionBudget.minAvailable | Minimum available balancer pods when the PDB is enabled. | 1 |
 | worker.image.repository              | Worker docker image repository                                                                      | Docker hub                                                                                         |
 | worker.image.tag                     | Worker image version                                                                                | Same as chart version                                                                              |
 | worker.image.pullPolicy              | Worker docker image update policy                                                                   | IfNotPresent                                                                                       |
 | worker.quorumRecovery                | Worker quorum auto recovery                                                                         | false                                                                                              |
 | worker.quorumCheckInterval           | Check quorum ever so often (seconds)                                                                | 15                                                                                                 |
-| worker.autoAddTablesInCluster        | Automatically adds all tables into cluster                                                          | 15                                                                                                 |
+| worker.autoAddTablesInCluster        | Automatically adds all tables into cluster                                                          | true                                                                                               |
 | worker.service.ql.port               | Worker service SQL port                                                                             | 9306                                                                                               |
 | worker.service.ql.targetPort         | Worker service SQL targetPort                                                                       | 9306                                                                                               |
 | worker.service.http.port             | Worker service HTTP port                                                                            | 9306                                                                                               |
@@ -472,6 +476,12 @@ worker:
 | serviceMonitor.enabled               | Enables service monitor resource for exporting runtime metrics to Prometheus                        | false                                                                                              |
 | serviceMonitor.interval              | Set how frequently Prometheus should scrape                        | 30s                                                                                                |
 | serviceMonitor.scrapeTimeout         | Set timeout for scrape                        | 10s                                                                                                |
+| serviceMonitor.targetComponent       | Limit metrics endpoints to `worker` or `balancer`; empty keeps legacy all-pod behavior. | "" |
+| serviceMonitor.labels                | Additional ServiceMonitor labels, such as `release: monitoring`. | {} |
+| serviceMonitor.namespaceSelector     | Optional ServiceMonitor namespace selector. | {} |
+| prometheusRule.enabled               | Create a PrometheusRule from `prometheusRule.groups`. | false |
+| prometheusRule.labels                | Additional PrometheusRule labels, such as `release: monitoring`. | {} |
+| prometheusRule.groups                | Prometheus rule groups rendered into the PrometheusRule. Required when enabled. | [] |
 | global.clusterDomainSuffix           | DNS suffix for cluster, to allow for configuration stripping of cluster suffix                      | cluster.local                                                                                      |
 
 </details>

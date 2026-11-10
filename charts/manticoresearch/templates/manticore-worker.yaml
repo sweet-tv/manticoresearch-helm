@@ -1,4 +1,21 @@
 {{- include "manticoresearch.validateMlock" . -}}
+{{- if and .Values.worker.quorumRecovery (ne .Values.worker.replicationMode "master-slave") -}}
+{{- fail "worker.quorumRecovery is supported only with worker.replicationMode=master-slave" -}}
+{{- end -}}
+{{- if and .Values.worker.quorumRecovery (le (int .Values.worker.quorumCheckInterval) 0) -}}
+{{- fail "worker.quorumCheckInterval must be greater than zero when worker.quorumRecovery is enabled" -}}
+{{- end -}}
+{{- if not (kindIs "slice" .Values.worker.readinessProbe.requiredTables) -}}
+{{- fail "worker.readinessProbe.requiredTables must be a list of Manticore table identifiers" -}}
+{{- end -}}
+{{- range .Values.worker.readinessProbe.requiredTables -}}
+{{- if not (kindIs "string" .) -}}
+{{- fail "worker.readinessProbe.requiredTables must contain only strings" -}}
+{{- end -}}
+{{- if not (regexMatch "^[A-Za-z_][A-Za-z0-9_]*$" .) -}}
+{{- fail (printf "Invalid worker.readinessProbe.requiredTables value %q: only Manticore table identifiers are allowed" .) -}}
+{{- end -}}
+{{- end -}}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -9,6 +26,10 @@ metadata:
     {{- include "manticoresearch.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.worker.replicaCount }}
+  {{- with .Values.worker.updateStrategy }}
+  updateStrategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   selector:
     matchLabels:
       app.kubernetes.io/component: worker
@@ -77,6 +98,10 @@ spec:
             value: {{ .Values.worker.replicationMode }}
           - name: LOG_LEVEL
             value: {{ .Values.worker.logLevel }}
+          - name: QUORUM_RECOVERY
+            value: {{ .Values.worker.quorumRecovery | quote }}
+          - name: QUORUM_RUN_INTERVAL
+            value: {{ .Values.worker.quorumCheckInterval | quote }}
           {{- if not (kindIs "slice" .Values.worker.searchd.extraArgs) }}
             {{- fail "worker.searchd.extraArgs must be a list of searchd flags" }}
           {{- end }}
@@ -97,7 +122,7 @@ spec:
                 fieldPath: metadata.namespace
         readinessProbe:
           {{- if .Values.worker.readinessProbe.enabled }}
-          {{- include "manticore-helm.render" (dict "value" (omit .Values.worker.readinessProbe "enabled") "context" $) | nindent 8 }}
+          {{- include "manticore-helm.render" (dict "value" (omit .Values.worker.readinessProbe "enabled" "requiredTables") "context" $) | nindent 8 }}
           exec:
             command:
               - /bin/sh
@@ -105,10 +130,16 @@ spec:
               - |
                 NODE_STATE=$(/usr/bin/mysql -e "show status like 'cluster_%_node_state';" 2>&1)
                 STATUS=$(/usr/bin/mysql -e "show status like 'cluster_%_status';" 2>&1)
-                if echo "$NODE_STATE" | grep -qE "[[:space:]]synced[[:space:]]" && echo "$STATUS" | grep -qE "[[:space:]]primary[[:space:]]"; then
-                  exit 0
+                if ! echo "$NODE_STATE" | grep -qE "[[:space:]]synced[[:space:]]" || ! echo "$STATUS" | grep -qE "[[:space:]]primary[[:space:]]"; then
+                  exit 1
                 fi
-                exit 1
+                REQUIRED_TABLES={{ join " " .Values.worker.readinessProbe.requiredTables | quote }}
+                if [ -n "$REQUIRED_TABLES" ]; then
+                  TABLES=$(/usr/bin/mysql -N -B -e "SHOW TABLES" 2>/dev/null) || exit 1
+                  for REQUIRED_TABLE in $REQUIRED_TABLES; do
+                    echo "$TABLES" | cut -f1 | grep -Fxq "$REQUIRED_TABLE" || exit 1
+                  done
+                fi
           {{- end }}
         livenessProbe:
           {{- if .Values.worker.livenessProbe.enabled }}

@@ -7,8 +7,10 @@ use Core\Manticore\ManticoreConnector;
 use Core\Manticore\ManticoreJson;
 use Core\Notifications\NotificationStub;
 use Monolog\Handler\StreamHandler;
+use SweetTv\Manticore\ClusterTableSynchronizer;
 
 require 'vendor/autoload.php';
+require 'cluster_tables.php';
 
 const REPLICATION_MODE_MULTI_MASTER = 'multi-master';
 const REPLICATION_MODE_MASTER_SLAVE = 'master-slave';
@@ -128,7 +130,7 @@ if ($count <= $min) {
         Logger::info('Cluster created');
     }
     if ($autoAddTablesIntoCluster) {
-        $manticore->addNotInClusterTablesIntoCluster();
+        (new ClusterTableSynchronizer($manticore))->synchronize();
     }
 } elseif ($manticoreJson->getConf() !== [] && $manticoreJson->hasCluster()) {
     Logger::info("Non empty conf");
@@ -154,7 +156,7 @@ if ($count <= $min) {
     if ($manticore->checkClusterName()) {
         Logger::info('Cluster exist');
         if ($autoAddTablesIntoCluster) {
-            $manticore->addNotInClusterTablesIntoCluster();
+            (new ClusterTableSynchronizer($manticore))->synchronize();
         }
     } else {
         try {

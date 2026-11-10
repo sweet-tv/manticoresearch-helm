@@ -85,7 +85,7 @@ if ( empty( $oldestWorker ) ) {
 
 $manticore = new ManticoreConnector( $oldestWorker . '.' . $workerService, $workerPort, null, - 1 );
 $tables    = $manticore->getTables( false );
-$podsIps   = $resources->getPodIpAllConditions();
+$podsIps   = $resources->getPodsIp();
 
 
 if ( $tables !== [] ) {
