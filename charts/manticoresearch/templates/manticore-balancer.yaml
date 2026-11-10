@@ -78,25 +78,17 @@ spec:
             value: {{ .Values.worker.service.ql.port | quote }}
           - name: WORKER_SERVICE
             value: {{ include "manticoresearch.fullname" . }}-worker-replication-svc
+        {{- if .Values.balancer.readinessProbe.enabled }}
         readinessProbe:
-          {{- if .Values.balancer.readinessProbe.enabled }}
-          {{- include "manticore-helm.render" (dict "value" (omit .Values.balancer.readinessProbe "enabled") "context" $) | nindent 8 }}
-          tcpSocket:
-            port: {{ .Values.balancer.service.ql.port }}
-          {{- end }}
+          {{- include "manticoresearch.balancerProbe" (dict "probe" .Values.balancer.readinessProbe "port" .Values.balancer.service.ql.port "name" "balancer.readinessProbe") | nindent 10 }}
+        {{- end }}
+        {{- if .Values.balancer.livenessProbe.enabled }}
         livenessProbe:
-          {{- if .Values.balancer.livenessProbe.enabled }}
-          {{- include "manticore-helm.render" (dict "value" (omit .Values.balancer.livenessProbe "enabled") "context" $) | nindent 8 }}
-          tcpSocket:
-            port: {{ .Values.balancer.service.ql.port }}
-          {{- end }}
-        {{- if semverCompare ">=1.20-0" $.Capabilities.KubeVersion.GitVersion }}
+          {{- include "manticoresearch.balancerProbe" (dict "probe" .Values.balancer.livenessProbe "port" .Values.balancer.service.ql.port "name" "balancer.livenessProbe") | nindent 10 }}
+        {{- end }}
+        {{- if and (semverCompare ">=1.20-0" $.Capabilities.KubeVersion.GitVersion) .Values.balancer.startupProbe.enabled }}
         startupProbe:
-          {{- if .Values.balancer.startupProbe.enabled }}
-          {{- include "manticore-helm.render" (dict "value" (omit .Values.balancer.startupProbe "enabled") "context" $) | nindent 8 }}
-          tcpSocket:
-            port: {{ .Values.balancer.service.ql.port }}
-          {{- end }}
+          {{- include "manticoresearch.balancerProbe" (dict "probe" .Values.balancer.startupProbe "port" .Values.balancer.service.ql.port "name" "balancer.startupProbe") | nindent 10 }}
         {{- end }}
         volumeMounts:
           - name: config-volume

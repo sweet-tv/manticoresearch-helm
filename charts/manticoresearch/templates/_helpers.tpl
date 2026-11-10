@@ -200,3 +200,25 @@ Substitute key for values to template
 {{- $value := .value | toYaml | trim }}
 {{ $value | indent 2 }}
 {{- end -}}
+
+{{/*
+Render a balancer probe while preserving the historical TCP handler as the
+default. Users may provide exactly one native Kubernetes probe handler.
+*/}}
+{{- define "manticoresearch.balancerProbe" -}}
+{{- $probe := omit .probe "enabled" -}}
+{{- $handlerCount := 0 -}}
+{{- range $handler := list "exec" "httpGet" "tcpSocket" "grpc" -}}
+{{- if hasKey $probe $handler -}}
+{{- $handlerCount = add1 $handlerCount -}}
+{{- end -}}
+{{- end -}}
+{{- if gt $handlerCount 1 -}}
+{{- fail (printf "%s must configure only one of exec, httpGet, tcpSocket, or grpc" .name) -}}
+{{- end -}}
+{{- toYaml $probe }}
+{{- if eq $handlerCount 0 }}
+tcpSocket:
+  port: {{ .port }}
+{{- end }}
+{{- end -}}

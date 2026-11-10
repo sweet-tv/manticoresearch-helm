@@ -60,7 +60,7 @@ Scenario filenames are descriptive. CI treats every recording as an exact test a
 
 Current standalone scenarios:
 
-- `balancer-agent-pconn.rec`, `cross-release-seed-restore-mre.rec`, `default-flow.rec`, `empty-cluster-nodes-recovery.rec`
+- `balancer-agent-pconn.rec`, `balancer-custom-probes.rec`, `cross-release-seed-restore-mre.rec`, `default-flow.rec`, `empty-cluster-nodes-recovery.rec`
 - `no-balancer-flow.rec`, `pod-labels.rec`, `searchd-extra-args.rec`, `sst-scale-replication.rec`
 - `stopwords-flow.rec`, `wordforms-configmap.rec`, `worker-mlock-ipc-lock.rec`, `worker-volume-attributes-class.rec`
 

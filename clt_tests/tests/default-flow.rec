@@ -20,6 +20,12 @@ if timeout 180 bash -c 'while [[ ! $(kubectl get po 2>&1 | grep "Running" | wc -
 ––– output –––
 OK
 ––– input –––
+for ordinal in 0 1 2; do pod="my-helm-manticoresearch-worker-$ordinal"; expected=$((ordinal + 1)); actual=$(kubectl exec "$pod" -- awk '$1 == "server_id" {print $3; exit}' /etc/manticoresearch/manticore.conf); echo "$pod server_id=$actual"; test "$actual" = "$expected" || exit 1; done
+––– output –––
+my-helm-manticoresearch-worker-0 server_id=1
+my-helm-manticoresearch-worker-1 server_id=2
+my-helm-manticoresearch-worker-2 server_id=3
+––– input –––
 for pod in my-helm-manticoresearch-worker-0 my-helm-manticoresearch-worker-1; do out=$(kubectl exec "$pod" -- mysql -h0 -P9306 -e "show status like 'cluster_%_node_state'; show status like 'cluster_%_status';" 2>/dev/null); state=$(echo "$out" | grep "cluster_manticore_cluster_node_state" | grep -o "synced"); status=$(echo "$out" | grep "cluster_manticore_cluster_status" | grep -o "primary"); echo "$pod state=$state status=$status"; done
 ––– output –––
 my-helm-manticoresearch-worker-0 state=synced status=primary
